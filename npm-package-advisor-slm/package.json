@@ -1,0 +1,12 @@
+{
+  "name": "npm-package-advisor-slm",
+  "version": "1.0.0",
+  "description": "NPM Package Update Advisor SLM",
+  "main": "node/data_collector.js",
+  "scripts": {
+    "collect": "node node/data_collector.js"
+  },
+  "dependencies": {
+    "npm": "^9.0.0"
+  }
+}
