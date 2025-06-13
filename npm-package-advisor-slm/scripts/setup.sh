@@ -1,8 +1,9 @@
-#!/bin/bash
+python#!/bin/bash
 
 # Setup Python environment
-python3 -m venv venv
-source venv/bin/activate
+python -m venv venv
+cd venv/Scripts
+./activate
 pip install -r requirements.txt
 
 # Setup Node.js environment

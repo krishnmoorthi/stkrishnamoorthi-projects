@@ -1,18 +1,99 @@
 import sys
 import json
+import os
 from pathlib import Path
 from datetime import datetime
+import subprocess
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from node.data_collector import getNpmDependencies
 from analysis.analyzer import UpdateAnalyzer
 from reporting.reporter import ReportGenerator
 from config.settings import Settings
 
+def verify_npm_installation():
+    try:
+        # Try both with and without shell=True
+        result = subprocess.run(
+            ['npm', '-v'],
+            capture_output=True,
+            text=True,
+            shell=True
+        )
+        if result.returncode == 0:
+            print(f"✅ Found npm version: {result.stdout.strip()}")
+            return True
+        
+        # Try alternative approach if first failed
+        npm_path = r"C:\Program Files\nodejs\npm.cmd" if os.name == 'nt' else 'npm'
+        result = subprocess.run(
+            [npm_path, '-v'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            print(f"✅ Found npm version: {result.stdout.strip()} at {npm_path}")
+            return True
+            
+        print(f"❌ NPM check failed: {result.stderr}")
+        return False
+    except Exception as e:
+        print(f"❌ NPM check error: {str(e)}")
+        return False
+
+def getNpmDependencies(project_path=None):
+    try:
+        project_path = project_path or Settings.SCAN_PROJECT_PATH
+        project_path = os.path.normpath(project_path)
+        
+        print(f"[DEBUG] Using project path: {project_path}")
+        
+        if not os.path.exists(project_path):
+            raise FileNotFoundError(f"Path does not exist: {project_path}")
+        
+        package_json = os.path.join(project_path, 'package.json')
+        if not os.path.exists(package_json):
+            raise FileNotFoundError(f"package.json not found in {project_path}")
+
+        command = ['node', 'node/data_collector.js', project_path]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).parent.parent),
+            timeout=30,
+            shell=True
+        )
+        
+        # Filter out any non-JSON output lines
+        json_output = '\n'.join(
+            line for line in result.stdout.split('\n') 
+            if line.strip().startswith('{') or line.strip().startswith('[')
+        )
+        
+        if not json_output:
+            raise ValueError("No valid JSON output received from Node process")
+            
+        return json.loads(json_output)
+    except subprocess.TimeoutExpired:
+        return {'error': 'Node process timed out after 30 seconds'}
+    except json.JSONDecodeError as e:
+        return {
+            'error': f"Invalid JSON from Node process: {str(e)}",
+            'output': result.stdout if 'result' in locals() else 'No output'
+        }
+    except Exception as e:
+        return {
+            'error': f"Unexpected error: {str(e)}",
+            'type': type(e).__name__
+        }
+    
 def main():
     print("🚀 Starting NPM Package Advisor SLM")
+    
+    if not verify_npm_installation():
+        sys.exit(1)
     
     try:
         # 1. Collect NPM data
@@ -21,6 +102,8 @@ def main():
         
         if 'error' in npm_data:
             print(f"❌ Error collecting data: {npm_data['error']}")
+            if 'additionalInfo' in npm_data:
+                print("Additional info:", npm_data['additionalInfo'])
             return 1
         
         # 2. Analyze with AI

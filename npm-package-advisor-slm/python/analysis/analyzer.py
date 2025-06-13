@@ -10,10 +10,13 @@ logger = logging.getLogger(__name__)
 
 class UpdateAnalyzer:
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-        self.model = os.getenv('AI_MODEL', 'gpt-4-1106-preview')
+        self.client = OpenAI(
+            base_url=os.getenv("AI_API_BASE_URL"),
+            api_key=os.getenv("AI_API_KEY")
+        )
+        self.model = os.getenv('AI_MODEL', 'llama3-70b-8192')
         
-    def analyze_dependencies(self, npm_data: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_dependencies(self, npm_data):
         """Analyze NPM dependencies and provide update recommendations"""
         try:
             prompt = self._build_analysis_prompt(npm_data)
@@ -21,7 +24,8 @@ class UpdateAnalyzer:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "system", "content": prompt}],
-                temperature=0.2,
+                temperature=0.3,
+                max_tokens=3000,
                 response_format={"type": "json_object"}
             )
             
